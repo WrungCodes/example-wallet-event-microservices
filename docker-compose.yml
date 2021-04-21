@@ -1,0 +1,116 @@
+version: '3.6'
+services:
+  # MySQL and document data store
+  ccrypt_db:
+    container_name: ccrypt_db
+    image: mysql:5.7
+    ports:
+      - "30030:3306"
+    restart: always
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_ROOT_PASSWORD: NULL
+      MYSQL_DATABASE: ccrypt-wallet
+      MYSQL_USER: root
+      MYSQL_PASSWORD: NULL
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3-management
+    hostname: my-rabbit
+    # volumes:
+    #   - ./rabbitmq/etc/definitions.json:/etc/rabbitmq/definitions.json
+    #   - ./rabbitmq/etc/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    #   - ./rabbitmq/data:/var/lib/rabbitmq/mnesia/rabbit@my-rabbit
+    #   - ./rabbitmq/logs:/var/log/rabbitmq/log
+    ports:
+      - 5672:5672
+      - 15672:15672
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:15672"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    
+  wallet:
+    container_name: ccrypt_wallet
+    build:
+      context: ./crypt-wallet
+    ports:
+      - "8000:50000"
+    command: >
+      bash -c " sleep 13; /usr/bin/supervisord"
+    restart: on-failure
+    depends_on:
+      - rabbitmq
+      - ccrypt_db
+    links:
+      - ccrypt_db:database
+      - rabbitmq:messagequeue
+    environment:
+      RABBITMQ_HOST: messagequeue
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_VHOST: /
+      RABBITMQ_PASSWORD: guest
+      DB_CONNECTION: mysql
+      DB_HOST: database
+      DB_PORT: 3306
+      DB_DATABASE: ccrypt-wallet
+      DB_USERNAME: root
+      DB_PASSWORD: null
+
+  main:
+    build:
+      context: ./crypt-main
+    container_name: ccrypt_main 
+    command: >
+      bash -c "sleep 15; /usr/bin/supervisord"
+    restart: on-failure
+    depends_on:
+      - wallet
+    links:
+      - wallet:ccrypt_wallet
+      - rabbitmq:messagequeue
+    ports:
+      - "8080:5000"
+    environment:
+      APP_PORT: 5000
+      RABBITMQ_HOST: messagequeue
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_VHOST: /
+      RABBITMQ_PASSWORD: guest
+      WALLET_HOST: ccrypt_wallet
+      WALLET_PORT: 50000
+
+  notify:
+    build:
+      context: ./crypt-notify
+    container_name: ccrypt_notify 
+    command: >
+      bash -c "sleep 15; /usr/bin/supervisord"
+    restart: on-failure
+    depends_on:
+      - wallet
+    links:
+      - rabbitmq:messagequeue
+    ports:
+      - "8081:8081"
+    environment:
+      RABBITMQ_HOST: messagequeue
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_VHOST: /
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_EMAIL_QUEUE: wallet_action.email
+      MAIL_FROM_ADDRESS: micro-ser@gmail.com
+      MAIL_PASSWORD: 7bdf555a7a33b9
+      MAIL_HOST: smtp.mailtrap.io
+      MAIL_PORT: 2525
+      MAIL_USERNAME: "a628aec3227a81"
+    

@@ -1,0 +1,21 @@
+{
+  "name": "crypt-user-client",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "server": "node index.js",
+    "wallet:consume": "node wallet-consumer.js"
+  },
+  "author": "danieltosinfayemi",
+  "license": "ISC",
+  "dependencies": {
+    "amqplib": "^0.7.1",
+    "axios": "^0.21.1",
+    "concurrently": "^6.0.2",
+    "dotenv": "^8.2.0",
+    "restify": "^8.5.1",
+    "restify-errors": "^8.0.2"
+  }
+}
